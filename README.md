@@ -9,21 +9,5 @@ pip install opencv-python
     Download and install Visual Studio Community Edition from Visual Studio. During installation, select the "Desktop development with C++" workload.
 2. 
 ```sh
-python -m venv myenv
-```
-3. 
-```sh
-pip install cmake
-```
-4. 
-```sh
-pip install wheel
-```
-5. 
-```sh
-pip install dlib==19.24.2
-```
-6.
-```sh
-pip install face_recognition
+pip install opencv-python deepface
 ```
