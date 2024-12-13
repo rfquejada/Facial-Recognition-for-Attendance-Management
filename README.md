@@ -1,8 +1,7 @@
 # Facial-Recognition-for-Attendance-Management
 
 ## Dependencies
-pip install face_recognition
-pip install opencv-python
+pip install face_recognition opencv-python numpy
 
 ## If face_recognition did not work do this:
 1. Install Visual Studio with C++ Tools:
