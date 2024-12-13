@@ -10,6 +10,12 @@ known_faces_dir = "known_faces"
 known_encodings = []
 known_names = []
 
+# Track True Positives, False Positives, and False Negatives
+true_positives = 0
+false_positives = 0
+false_negatives = 0
+total_faces = 0  # Total number of faces processed
+
 for person_name in os.listdir(known_faces_dir):
     person_dir = os.path.join(known_faces_dir, person_name)
     if not os.path.isdir(person_dir):
@@ -67,6 +73,8 @@ while True:
     face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 
     for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
+        total_faces += 1  # Increment total faces processed
+
         # Scale back up face locations to match the original frame size
         top *= 4
         right *= 4
@@ -74,20 +82,19 @@ while True:
         left *= 4
 
         # Compare the detected face to the known faces
-        matches = face_recognition.compare_faces(known_encodings, face_encoding)
+        distances = face_recognition.face_distance(known_encodings, face_encoding)
+        best_match_index = np.argmin(distances)
         name = "Unknown"
 
-        if True in matches:
-            # Find the first match index
-            match_index = matches.index(True)
-            name = known_names[match_index]
+        if distances[best_match_index] < 0.6:  # Threshold for a confident match
+            name = known_names[best_match_index]
 
             if name not in marked_present:
                 wb = load_workbook(attendance_file)
                 ws = wb["Attendance"]
                 today = datetime.now().strftime("%Y-%m-%d")
                 
-                # Extract headers and ensure "TIME" column is present
+                # Extract headers and ensure "Time" column is present
                 headers = [cell.value for cell in ws[1] if cell.value is not None]
                 
                 # Add the date column if missing
@@ -95,7 +102,7 @@ while True:
                     ws.cell(row=1, column=len(headers) + 1, value=today)
                     headers.append(today)
                 
-                # Add the "TIME" column if missing
+                # Add the "Time" column if missing
                 if "Time" not in headers:
                     ws.cell(row=1, column=len(headers) + 1, value="Time")
                     headers.append("Time")
@@ -113,6 +120,14 @@ while True:
                 wb.save(attendance_file)
                 marked_present.add(name)
 
+                true_positives += 1  # Correctly recognized the person
+
+            else:
+                false_positives += 1  # False alarm for someone already marked as present
+
+        else:
+            false_negatives += 1  # Face detected but did not match known faces
+
         # Draw a rectangle around the face
         cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
 
@@ -125,6 +140,21 @@ while True:
     # Exit the loop if 'q' is pressed
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
+
+# Calculate performance metrics after the loop ends
+accuracy = (true_positives / total_faces) * 100 if total_faces > 0 else 0
+precision = (true_positives / (true_positives + false_positives)) * 100 if (true_positives + false_positives) > 0 else 0
+recall = (true_positives / (true_positives + false_negatives)) * 100 if (true_positives + false_negatives) > 0 else 0
+
+# Output the results
+print("\nPerformance Metrics:")
+print(f"Total Faces Processed: {total_faces}")
+print(f"True Positives: {true_positives}")
+print(f"False Positives: {false_positives}")
+print(f"False Negatives: {false_negatives}")
+print(f"Accuracy: {accuracy:.2f}%")
+print(f"Precision: {precision:.2f}%")
+print(f"Recall: {recall:.2f}%")
 
 # Release the camera and close all windows
 camera.release()
