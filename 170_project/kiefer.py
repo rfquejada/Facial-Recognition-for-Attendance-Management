@@ -34,6 +34,9 @@ for person_name in os.listdir(known_faces_dir):
 
 print(f"Loaded {len(known_encodings)} faces from {len(set(known_names))} people.")
 
+# Sort the names alphabetically
+known_names_sorted = sorted(set(known_names))
+                            
 # Create or load the attendance file
 attendance_file = "attendance.xlsx"
 if not os.path.exists(attendance_file):
@@ -41,7 +44,7 @@ if not os.path.exists(attendance_file):
     ws = wb.active
     ws.title = "Attendance"
     ws.append(["Name"] + [datetime.now().strftime("%Y-%m-%d")])
-    for name in set(known_names):
+    for name in known_names_sorted:
         ws.append([name])
     wb.save(attendance_file)
 
