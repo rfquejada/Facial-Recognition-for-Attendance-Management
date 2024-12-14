@@ -21,14 +21,13 @@ for person_name in os.listdir(known_faces_dir):
     if not os.path.isdir(person_dir):
         continue
 
-    print(f"Processing {person_name}'s images...")
-    for image_name in os.listdir(person_dir):
+    print(f"Processing {person_name}'s images...")  
+    for image_name in os.listdir(person_dir):   #access the directory containing the person name
         image_path = os.path.join(person_dir, image_name)
-        # Load the image and encode the face
-        image = face_recognition.load_image_file(image_path)
+        image = face_recognition.load_image_file(image_path)  #load the image of the person for processing
         encodings = face_recognition.face_encodings(image)
         if encodings:
-            # Add the encoding and the person's name to the lists
+            #add the encoding and the person's name to the lists
             known_encodings.append(encodings[0])
             known_names.append(person_name)
 
@@ -37,7 +36,7 @@ print(f"Loaded {len(known_encodings)} faces from {len(set(known_names))} people.
 # Sort the names alphabetically
 known_names_sorted = sorted(set(known_names))
                             
-# Create or load the attendance file
+#create or load the attendance file for appending or creating
 attendance_file = "attendance.xlsx"
 if not os.path.exists(attendance_file):
     wb = Workbook()
@@ -45,17 +44,32 @@ if not os.path.exists(attendance_file):
     ws.title = "Attendance"
     ws.append(["Name"] + [datetime.now().strftime("%Y-%m-%d")])
     for name in known_names_sorted:
-        ws.append([name])
+        # Initialize each name with ABSENT for the current date
+        ws.append([name, "ABSENT"])
     wb.save(attendance_file)
 
-# Initialize the camera
+# Mark attendance with default 'ABSENT' for new dates
+else:
+    wb = load_workbook(attendance_file)
+    ws = wb["Attendance"]
+    today = datetime.now().strftime("%Y-%m-%d")
+    headers = [cell.value for cell in ws[1] if cell.value is not None]
+
+    # Add the date column if missing and set default to 'ABSENT'
+    if today not in headers:
+        ws.cell(row=1, column=len(headers) + 1, value=today)
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=len(headers) + 1):
+            row[-1].value = "ABSENT"
+    wb.save(attendance_file)
+
+# initialize the camera
 camera = cv2.VideoCapture(0)
 
-if not camera.isOpened():
+if not camera.isOpened():  #check if the camera is open or not
     print("Error: Could not open the camera.")
     exit()
 
-print("Press 'q' to quit.")
+print("Press 'q' to quit.")   #check if the attendance process is finished or done
 
 # List to track who has been marked present
 marked_present = set()
@@ -67,50 +81,50 @@ while True:
         print("Failed to grab a frame.")
         break
 
-    # Resize frame for faster processing
+    #resize the frame for accurate processing of result of the person
     small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
     rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
 
-    # Detect faces in the frame
+    #detect the faces of the person in the given frame considering the database of the students
     face_locations = face_recognition.face_locations(rgb_small_frame)
     face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 
     for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-        total_faces += 1  # Increment total faces processed
+        total_faces += 1  #increment the total faces processed
 
-        # Scale back up face locations to match the original frame size
+        #scale back up face locations to match the original frame size
         top *= 4
         right *= 4
         bottom *= 4
         left *= 4
 
-        # Compare the detected face to the known faces
+        #comparison of the detected faces on the student database
         distances = face_recognition.face_distance(known_encodings, face_encoding)
         best_match_index = np.argmin(distances)
         name = "Unknown"
 
-        if distances[best_match_index] < 0.6:  # Threshold for a confident match
+        if distances[best_match_index] < 0.6:  #threshold for a confident match
             name = known_names[best_match_index]
 
             if name not in marked_present:
                 wb = load_workbook(attendance_file)
                 ws = wb["Attendance"]
-                today = datetime.now().strftime("%Y-%m-%d")
+                today = datetime.now().strftime("%Y-%m-%d")  #get the current time for the attendance
                 
                 # Extract headers and ensure "Time" column is present
                 headers = [cell.value for cell in ws[1] if cell.value is not None]
                 
-                # Add the date column if missing
+                #add the date
                 if today not in headers:
                     ws.cell(row=1, column=len(headers) + 1, value=today)
                     headers.append(today)
                 
-                # Add the "Time" column if missing
+                #add the time of attendance
                 if "Time" not in headers:
                     ws.cell(row=1, column=len(headers) + 1, value="Time")
                     headers.append("Time")
 
-                # Mark as present and record time
+                #mark the student as present and record the time 
                 current_time = datetime.now().strftime("%H:%M:%S")
                 for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=len(headers)):
                     if row[0].value == name:
@@ -123,7 +137,7 @@ while True:
                 wb.save(attendance_file)
                 marked_present.add(name)
 
-                true_positives += 1  # Correctly recognized the person
+                true_positives += 1  #correctly identify the person, mark as true positive
 
             else:
                 false_positives += 1  # False alarm for someone already marked as present
@@ -131,13 +145,13 @@ while True:
         else:
             false_negatives += 1  # Face detected but did not match known faces
 
-        # Draw a rectangle around the face
+        #create a frame for visualization
         cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
 
-        # Display the name below the rectangle
+        #display the name for the student
         cv2.putText(frame, name, (left, bottom + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 2)
 
-    # Display the video feed
+    #display the video feed
     cv2.imshow("Camera", frame)
 
     # Exit the loop if 'q' is pressed
@@ -152,12 +166,12 @@ recall = (true_positives / (true_positives + false_negatives)) * 100 if (true_po
 # Output the results
 print("\nPerformance Metrics:")
 print(f"Total Faces Processed: {total_faces}")
-print(f"True Positives: {true_positives}")
-print(f"False Positives: {false_positives}")
-print(f"False Negatives: {false_negatives}")
-print(f"Accuracy: {accuracy:.2f}%")
-print(f"Precision: {precision:.2f}%")
-print(f"Recall: {recall:.2f}%")
+# print(f"True Positives: {true_positives}")
+# print(f"False Positives: {false_positives}")
+# print(f"False Negatives: {false_negatives}")
+# print(f"Accuracy: {accuracy:.2f}%")
+# print(f"Precision: {precision:.2f}%")
+# print(f"Recall: {recall:.2f}%")
 
 # Release the camera and close all windows
 camera.release()
